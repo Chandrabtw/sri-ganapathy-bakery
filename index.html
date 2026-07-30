@@ -132,7 +132,7 @@ renderShop();
 
 /* Clear customer navigation state: Home and Online Order are separate routes. */
 const landingActions=document.querySelector('.landing-actions');
-const homeGreeting=document.createElement('span');
+var homeGreeting=document.createElement('span');
 homeGreeting.id='homeCustomerGreeting';
 homeGreeting.style.cssText='display:none;align-self:center;font-weight:800;color:var(--brown);white-space:nowrap';
 landingActions.prepend(homeGreeting);
@@ -149,8 +149,7 @@ async function syncCustomerNavigation(){
   const fullName=session?.user?.user_metadata?.full_name?.trim();
   const message=fullName?`Dear ${fullName.split(/\s+/)[0]}`:'';
   customerGreeting.textContent=message;
-  homeGreeting.textContent=message;
-  homeGreeting.style.display=fullName?'inline':'none';
+  if(homeGreeting){homeGreeting.textContent=message;homeGreeting.style.display=fullName?'inline':'none'}
   customerAccountButton.style.display=fullName?'none':'';
   if(adminAccessButton)adminAccessButton.style.display=fullName?'none':'';
   shopLogoutButton.style.display=fullName?'':'none';
@@ -288,9 +287,9 @@ if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This accou
 
 /* Cake weights have independent prices. They must never be derived from another weight. */
 const cakeSizePrices=JSON.parse(localStorage.cakeSizePrices||'{}');
-const hiddenCakeSizes=JSON.parse(localStorage.hiddenCakeSizes||'{}');
+var hiddenCakeSizes=JSON.parse(localStorage.hiddenCakeSizes||'{}');
 function cakeKey(name){return cleanProductName(name).toLowerCase()}
-function cakeWeights(name){return [250,500,1000,2000].filter(grams=>!hiddenCakeSizes[cakeKey(name)]?.includes(grams))}
+function cakeWeights(name){return [250,500,1000,2000].filter(grams=>!hiddenCakeSizes?.[cakeKey(name)]?.includes(grams))}
 function listedCakeWeight(name){const match=String(name).match(/(\d+(?:\.\d+)?)\s*(g|kg)\b/i);return match?Number(match[1])*(match[2].toLowerCase()==='kg'?1000:1):500}
 function defaultCakePrice(name,grams){
   const group=all().filter(product=>product.c==='Cakes'&&cakeKey(product.n)===cakeKey(name));
@@ -364,7 +363,3 @@ renderShop=function(){
   cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
 }
 </script></body></html>
-
-/* Trigger GitHub Pages rebuild: publish the corrected Cake tab renderer. */
-
-/* Publish the corrected Cake tab renderer. */
