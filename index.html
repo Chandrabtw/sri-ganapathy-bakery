@@ -169,20 +169,25 @@ supabaseClient.auth.onAuthStateChange((event,session)=>setTimeout(async()=>{
 function cleanProductName(name){return name.replace(/\s+(?:Box\s+)?(?:\d+\s*)?(?:G|Kg)\b/ig,'').replace(/\s+Box$/i,'').trim()}
 function productData(name){return all().find(product=>product.n===name)}
 function isCake(name){return productData(name)?.c==='Cakes'}
-function cakePrice(name,grams){const base=Number(productData(name)?.p||0);return grams===250?base/2:grams===1000?base*2:base}
+function cakePrice(name,grams){
+  const product=productData(name),listedPrice=Number(product?.p||0);
+  const match=String(product?.n||'').match(/(\d+(?:\.\d+)?)\s*(g|kg)\b/i);
+  const referenceGrams=match?Number(match[1])*(match[2].toLowerCase()==='kg'?1000:1):500;
+  return listedPrice*grams/referenceGrams;
+}
 function cakeDescription(name){return `Freshly prepared ${cleanProductName(name)}. Select the weight that is right for your celebration.`}
 function cartKey(source,grams){return `${source}__${grams||'standard'}`}
 function cartUnitPrice(item){return Number(item.unit_price ?? productData(item.source||item.n)?.p ?? 0)}
 function cartLabel(item){return item.weight_grams?`${cleanProductName(item.n)} · ${item.weight_grams}g`:cleanProductName(item.n)}
 function productQty(name){return cart.filter(item=>(item.source||item.n)===name).reduce((sum,item)=>sum+item.q,0)}
 function showCakeSizePicker(name){
-  const image=imageFor(name),sizes=[250,500,1000];
+  const image=imageFor(name),sizes=[250,500,1000,2000];
   modalContent.innerHTML=`<button class="close" onclick="closeModal()">×</button><div style="display:grid;grid-template-columns:minmax(170px,.8fr) 1.2fr;gap:20px;align-items:start"><img src="${image}" alt="${cleanProductName(name)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:15px"><div><h2 style="margin-bottom:8px">${cleanProductName(name)}</h2><p style="color:#765f50;line-height:1.5">${cakeDescription(name)}</p><label style="display:block;font-weight:700;margin:16px 0 8px">Choose cake weight</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${sizes.map((grams,index)=>`<button id="cakeSize${grams}" class="small-btn" style="padding:12px 6px;border:2px solid ${index===1?'var(--brown)':'var(--line)'}" onclick="selectCakeWeight('${name.replace(/'/g,"\\'")}',${grams})">${grams===1000?'1 kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></button>`).join('')}</div><p id="selectedCakePrice" class="total" style="margin:16px 0">Selected: 500g · ₹${cakePrice(name,500).toFixed(2)}</p><button class="cta" style="width:100%" onclick="addCakeToCart('${name.replace(/'/g,"\\'")}')">Add to cart</button></div></div>`;
   window.selectedCake={name,grams:500};modal.style.display='block';
 }
 function selectCakeWeight(name,grams){
   window.selectedCake={name,grams};
-  [250,500,1000].forEach(size=>{const button=document.getElementById(`cakeSize${size}`);if(button)button.style.borderColor=size===grams?'var(--brown)':'var(--line)'});
+  [250,500,1000,2000].forEach(size=>{const button=document.getElementById(`cakeSize${size}`);if(button)button.style.borderColor=size===grams?'var(--brown)':'var(--line)'});
   document.getElementById('selectedCakePrice').textContent=`Selected: ${grams===1000?'1 kg':`${grams}g`} · ₹${cakePrice(name,grams).toFixed(2)}`;
 }
 function addCakeToCart(name){const grams=window.selectedCake?.name===name?window.selectedCake.grams:500;addExactProduct(name,grams);closeModal()}
@@ -220,7 +225,7 @@ function renderShop(){
     const price=Number(prices[name]??base),quantity=productQty(name),safe=name.replace(/'/g,"\\'"),image=imageFor(name),photo=image?`<img alt="${cleanProductName(name)}" src="${image}">`:'<div class="empty-photo"></div>';
     if(category==='Cakes'){
       const selected=(window.cakeCardWeights||{})[name]||500,id=name.replace(/[^a-z0-9]/gi,'');
-      return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;margin:10px 0">${[250,500,1000].map(grams=>`<label style="border:1px solid ${selected===grams?'var(--brown)':'var(--line)'};border-radius:8px;padding:7px 3px;text-align:center;font-size:.78rem;cursor:pointer"><input type="radio" name="cake-${id}" ${selected===grams?'checked':''} onchange="setCakeCardWeight('${safe}',${grams});renderShop()" style="accent-color:var(--brown)"><br>${grams===1000?'1kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></label>`).join('')}</div><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
+      return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:10px 0">${[250,500,1000,2000].map(grams=>`<label style="border:1px solid ${selected===grams?'var(--brown)':'var(--line)'};border-radius:8px;padding:7px 3px;text-align:center;font-size:.74rem;cursor:pointer"><input type="radio" name="cake-${id}" ${selected===grams?'checked':''} onchange="setCakeCardWeight('${safe}',${grams});renderShop()" style="accent-color:var(--brown)"><br>${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></label>`).join('')}</div><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
     }
     return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><span class="price">₹${price.toFixed(2)}</span><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
   }).join('');cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
@@ -245,5 +250,25 @@ function renderShop(){
     syncCustomerNavigation();
   };
 })();
+
+/* Admin credentials are deliberately not valid for the customer portal. */
+async function submitCustomerAuth(e){
+  e.preventDefault();
+  const form=e.currentTarget,mode=e.submitter?.value||'login',email=form.email.value.trim().toLowerCase(),password=form.password.value;
+  if(mode==='signup'){
+    const full_name=form.fullName.value.trim(),phone=form.phone.value.trim(),address=form.address.value.trim();
+    if(!full_name||!phone||!address)return showSignupFields();
+    const result=await supabaseClient.auth.signUp({email,password,options:{data:{full_name,phone,address},emailRedirectTo:customerRedirectUrl()}});
+    if(result.error)return alert(result.error.message);
+    alert('Account created. Please open the activation link sent to your email, then log in. Check Spam or Promotions if it is not in your Inbox.');
+    closeModal();
+    return;
+  }
+  const result=await supabaseClient.auth.signInWithPassword({email,password});
+  if(result.error)return alert(`Login failed: ${result.error.message}`);
+  const adminCheck=await supabaseClient.rpc('is_admin');
+  if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This is an Admin account. Please use the Admin login.')}
+  await updateCustomerAccountButton();closeModal();alert('Customer login successful.');
+}
 
 </script></body></html>
