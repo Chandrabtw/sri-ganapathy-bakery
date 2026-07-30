@@ -28,6 +28,7 @@
       .line{grid-template-columns:1fr auto;gap:8px}.line>.quantity{grid-column:1 / -1;justify-content:center}
       .checkout-wrap{display:grid;grid-template-columns:1fr auto;gap:10px}.checkout-wrap .checkout{grid-column:1;justify-self:center}.checkout-wrap .cart-total{position:static;grid-column:2;justify-self:end;font-size:1rem}
       .card .quantity{justify-content:center}.qty-btn{width:34px;height:34px}.tabs{gap:6px}.tabs button{padding:8px 10px;font-size:.85rem}
+      .card .info>div[style*="repeat(4"]{grid-template-columns:repeat(3,1fr)!important}.card .info>div[style*="repeat(4"] label:last-child{grid-column:2}
     }
   </style>
 </head>
@@ -116,7 +117,7 @@ function renderReportRange(){const start=document.getElementById('reportStart').
 function imageFor(name){
   const direct=customImages[name]||cakeImages[name]||pastryImages[name]||puffImages[name]||breadImages[name]||teaImages[name]||cookieImages[name]||dessertImages[name];
   if(direct)return direct;
-  if(/white\s*forest/i.test(name))return 'https://images.unsplash.com/photo-1559622214-f8a9850965bb?auto=format&fit=crop&w=900&q=85';
+  if(/white\s*forest/i.test(name))return 'assets/white-forest-cake.png';
   return isCake(name)?photos.cake:'';
 }
 function renderShop(){tabs.innerHTML=catalog.map(([c],i)=>`<button class="${i===active?'active':''}" onclick="active=${i};renderShop()">${c}</button>`).join('');const [cat,items]=catalog[active]||['',[]];products.innerHTML=items.map(([n,base])=>{const p=prices[n]??base,q=productQty(n),safe=n.replace(/'/g,"\\'"),src=imageFor(n),photo=src?`<img alt="${n}" src="${src}">`:'<div class="empty-photo"></div>';return `<article class="card">${photo}<div class="info"><h3>${n}</h3><span class="price">₹${p.toFixed(2)}</span><div class="quantity"><button class="qty-btn" aria-label="Remove one ${n}" onclick="remove('${safe}')">−</button><span class="qty-number">${q}</span><button class="qty-btn" aria-label="Add one ${n}" onclick="add('${safe}')">+</button></div></div></article>`}).join('');cartCount.textContent=cart.reduce((s,x)=>s+x.q,0)}
@@ -274,8 +275,24 @@ async function submitCustomerAuth(e){
   const result=await supabaseClient.auth.signInWithPassword({email,password});
   if(result.error)return alert(`Login failed: ${result.error.message}`);
   const adminCheck=await supabaseClient.rpc('is_admin');
-if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This account is not registered as a customer. Please use the Admin login.')}
+if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This account is not registered as a customer.')}
   await updateCustomerAccountButton();closeModal();alert('Customer login successful.');
+}
+
+/* Cakes have one stored reference price, with editable prices for every size. */
+const originalRenderEditor=renderEditor;
+function setCakeEditorPrice(name,grams,value){
+  const product=productData(name),match=String(product?.n||'').match(/(\d+(?:\.\d+)?)\s*(g|kg)\b/i);
+  const reference=match?Number(match[1])*(match[2].toLowerCase()==='kg'?1000:1):500;
+  setPrice(name,Number(value)*reference/grams);renderEditor();
+}
+function renderEditor(){
+  originalRenderEditor();
+  editor.innerHTML=all().map(product=>{
+    const safe=product.n.replace(/'/g,"\\'");
+    if(product.c!=='Cakes')return `<div class="edit-row"><span>${product.c} · ${cleanProductName(product.n)}</span><input aria-label="Price for ${product.n}" type="number" step=".01" value="${product.p}" onchange="setPrice('${safe}',this.value)"></div>`;
+    return `<div class="edit-row" style="display:block"><b>Cakes · ${cleanProductName(product.n)}</b><div style="display:grid;grid-template-columns:repeat(4,minmax(76px,1fr));gap:8px;margin-top:8px">${[250,500,1000,2000].map(grams=>`<label style="font-size:.82rem">${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<input aria-label="${grams}g price for ${product.n}" type="number" step=".01" value="${cakePrice(product.n,grams).toFixed(2)}" onchange="setCakeEditorPrice('${safe}',${grams},this.value)"></label>`).join('')}</div></div>`;
+  }).join('')||'<p>No products yet.</p>';
 }
 
 </script></body></html>
