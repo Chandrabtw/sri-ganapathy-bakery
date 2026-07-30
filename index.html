@@ -328,7 +328,7 @@ function renderEditor(){
 
 /* Final home layout and cart compatibility fixes. */
 const finalHomeStyle=document.createElement('style');
-finalHomeStyle.textContent=`.welcome{display:flex;flex-direction:column}.welcome h1{order:1;margin-top:0}.welcome .tag{order:2;display:block;width:fit-content;margin:4px auto 14px}.welcome p{order:3}.welcome .roles{order:4}@media(max-width:720px){.hero{background-size:100% auto;background-position:center top;padding:18svh 20px 8px}.welcome .tag{margin:3px auto 10px}}`;
+finalHomeStyle.textContent=`.welcome{display:flex;flex-direction:column}.welcome h1{order:1;margin-top:0}.welcome .tag{order:2;display:block;width:fit-content;margin:4px auto 14px}.welcome p{order:3}.welcome .roles{order:4}@media(max-width:720px){.hero{background-size:100% auto;background-position:center top;padding:18svh 20px 8px}.welcome .tag{margin:3px auto 10px}.checkout-wrap .cta{width:auto;flex:0 0 auto;white-space:nowrap;padding:10px 12px}.checkout-wrap{gap:8px;flex-wrap:wrap}}`;
 document.head.append(finalHomeStyle);
 function showCart(){
   cart=cart.map(item=>item.key?item:{...item,source:item.source||item.n,key:cartKey(item.source||item.n,item.weight_grams),unit_price:item.unit_price??productData(item.n)?.p});
