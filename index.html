@@ -288,12 +288,12 @@ function setCakeEditorPrice(name,grams,value){
   setPrice(name,Number(value)*reference/grams);renderEditor();
 }
 function renderEditor(){
-  originalRenderEditor();
   editor.innerHTML=all().map(product=>{
     const safe=product.n.replace(/'/g,"\\'");
     if(product.c!=='Cakes')return `<div class="edit-row"><span>${product.c} · ${cleanProductName(product.n)}</span><input aria-label="Price for ${product.n}" type="number" step=".01" value="${product.p}" onchange="setPrice('${safe}',this.value)"></div>`;
     return `<div class="edit-row" style="display:block"><b>Cakes · ${cleanProductName(product.n)}</b><div style="display:grid;grid-template-columns:repeat(4,minmax(76px,1fr));gap:8px;margin-top:8px">${[250,500,1000,2000].map(grams=>`<label style="font-size:.82rem">${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<input aria-label="${grams}g price for ${product.n}" type="number" step=".01" value="${cakePrice(product.n,grams).toFixed(2)}" onchange="setCakeEditorPrice('${safe}',${grams},this.value)"></label>`).join('')}</div></div>`;
   }).join('')||'<p>No products yet.</p>';
+  menuManager.innerHTML=`<form class="menu-form" onsubmit="createCategory(event)"><b>Add a category</b><input id="newCategory" placeholder="Category name" required><button class="cta">Add category</button></form><form class="menu-form" onsubmit="createMenuItem(event)"><b>Add a product</b><select name="category" required><option value="">Choose category</option>${catalog.map(([category])=>`<option>${category}</option>`).join('')}</select><input name="itemName" placeholder="Item name" required><input name="itemPrice" type="number" step=".01" min="0" placeholder="Price in rupees" required><input name="itemPhoto" type="file" accept="image/*"><button class="cta">Add product</button></form><div class="menu-list"><b>Existing menu</b>${catalog.map(([category,items])=>`<div class="menu-group"><div class="menu-item"><b>${category}</b><button class="danger" onclick="deleteCategory('${category.replace(/'/g,"\\'")}')">Delete category</button></div>${items.map(([name])=>`<div class="menu-item"><span>${cleanProductName(name)}</span><button class="small-btn" onclick="deleteMenuItem('${category.replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}')">Delete</button></div>`).join('')||'<small>No items yet</small>'}</div>`).join('')}</div>`;
 }
 
 </script></body></html>
