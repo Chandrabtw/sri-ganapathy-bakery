@@ -216,7 +216,7 @@ function remove(name){const item=cart.filter(product=>(product.source||product.n
 function changeCart(key,delta){const item=cart.find(product=>product.key===key);if(!item)return;if(delta>0)item.q++;else {item.q--;if(item.q<=0)cart=cart.filter(product=>product!==item)}localStorage.cart=JSON.stringify(cart);renderShop();showCart()}
 function renderShop(){
   tabs.innerHTML=catalog.map(([category],index)=>`<button class="${index===active?'active':''}" onclick="active=${index};renderShop()">${category}</button>`).join('');
-  const [category,items]=catalog[active]||['',[]],displayItems=category==='Cakes'?[...new Map(items.map(item=>[cleanProductName(item[0]),item])).values()]:items;
+  let [category,items]=catalog[active]||['',[]];if(category==='Cakes'&&!items.length)items=[['Chocolate Truffle Cake',910],['Black Forest Cake',443],['White Forest Cake 500 G',443],['Butterscotch Cake 500 G',443],['Pineapple Rich Cake 500 G',395],['Hazelnut Chocolate Cake',657],['Plum Cake Box 500 G',505]];const displayItems=category==='Cakes'?[...new Map(items.map(item=>[cleanProductName(item[0]),item])).values()]:items;
   products.innerHTML=displayItems.map(([name,base])=>{const price=Number(prices[name]??base),quantity=productQty(name),safe=name.replace(/'/g,"\\'"),source=imageFor(name),photo=source?`<img alt="${cleanProductName(name)}" src="${source}">`:'<div class="empty-photo"></div>';return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><span class="price">${category==='Cakes'?`From ₹${(price/2).toFixed(2)}`:`₹${price.toFixed(2)}`}</span><div class="quantity"><button class="qty-btn" aria-label="Remove one ${cleanProductName(name)}" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add one ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`}).join('');
   cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
 }
@@ -336,5 +336,15 @@ function showCart(){
   const lines=cart.map(item=>{const safe=item.key.replace(/'/g,"\\'"),source=imageFor(item.source||item.n),photo=source?`<img src="${source}" alt="${cartLabel(item)}" style="width:64px;height:64px;object-fit:cover;border-radius:12px">`:'<div style="width:64px;height:64px;border-radius:12px;background:#f2d5b7"></div>';return `<div class="line"><div style="display:flex;gap:12px;align-items:center">${photo}<div><b>${cartLabel(item)}</b><div class="quantity"><button class="qty-btn" onclick="changeCart('${safe}',-1)">−</button><span class="qty-number">${item.q}</span><button class="qty-btn" onclick="changeCart('${safe}',1)">+</button></div></div></div><b>₹${(cartUnitPrice(item)*item.q).toFixed(2)}</b></div>`}).join('')||'<p>Your cart is empty.</p>';
   const total=cart.reduce((sum,item)=>sum+cartUnitPrice(item)*item.q,0);
   modalContent.innerHTML=`<h2>Your cart</h2>${lines}${cart.length?`<div class="checkout-wrap"><button class="cta" onclick="clearCart()">Clear Cart</button><button class="cta" onclick="checkout()">Checkout</button><span class="total cart-total">Total: ₹${total.toFixed(2)}</span></div>`:''}`;modal.style.display='block';
+}
+/* Do not allow an empty Cake tab if remote menu data is incomplete. */
+const cakeSafeRender=renderShop;
+renderShop=function(){
+  cakeSafeRender();
+  const selected=catalog[active];
+  if(selected?.[0]==='Cakes'&&!products.children.length){
+    const fallback=[['Chocolate Truffle Cake',910],['Black Forest Cake',443],['White Forest Cake 500 G',443],['Butterscotch Cake 500 G',443],['Pineapple Rich Cake 500 G',395],['Hazelnut Chocolate Cake',657],['Plum Cake Box 500 G',505]];
+    products.innerHTML=fallback.map(([name,price])=>`<article class="card"><img src="${imageFor(name)}" alt="${cleanProductName(name)}"><div class="info"><h3>${cleanProductName(name)}</h3><span class="price">₹${price.toFixed(2)}</span><div class="quantity"><button class="qty-btn" onclick="remove('${name}')">−</button><span class="qty-number">0</span><button class="qty-btn" onclick="add('${name}')">+</button></div></div></article>`).join('');
+  }
 }
 </script></body></html>
