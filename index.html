@@ -240,7 +240,7 @@ function renderShop(){
     const price=Number(prices[name]??base),quantity=productQty(name),safe=name.replace(/'/g,"\\'"),image=imageFor(name),photo=image?`<img alt="${cleanProductName(name)}" src="${image}">`:'<div class="empty-photo"></div>';
     if(category==='Cakes'){
       const selected=(window.cakeCardWeights||{})[name]||500,id=name.replace(/[^a-z0-9]/gi,'');
-      return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:10px 0">${[250,500,1000,2000].map(grams=>`<label style="border:1px solid ${selected===grams?'var(--brown)':'var(--line)'};border-radius:8px;padding:7px 3px;text-align:center;font-size:.74rem;cursor:pointer"><input type="radio" name="cake-${id}" ${selected===grams?'checked':''} onchange="setCakeCardWeight('${safe}',${grams});renderShop()" style="accent-color:var(--brown)"><br>${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></label>`).join('')}</div><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
+      return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:10px 0">${cakeWeights(name).map(grams=>`<label style="border:1px solid ${selected===grams?'var(--brown)':'var(--line)'};border-radius:8px;padding:7px 3px;text-align:center;font-size:.74rem;cursor:pointer"><input type="radio" name="cake-${id}" ${selected===grams?'checked':''} onchange="setCakeCardWeight('${safe}',${grams});renderShop()" style="accent-color:var(--brown)"><br>${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></label>`).join('')}</div><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
     }
     return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><span class="price">₹${price.toFixed(2)}</span><div class="quantity"><button class="qty-btn" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`;
   }).join('');cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
@@ -286,20 +286,44 @@ if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This accou
   await updateCustomerAccountButton();closeModal();alert('Customer login successful.');
 }
 
-/* Cakes have one stored reference price, with editable prices for every size. */
-const originalRenderEditor=renderEditor;
+/* Cake weights have independent prices. They must never be derived from another weight. */
+const cakeSizePrices=JSON.parse(localStorage.cakeSizePrices||'{}');
+const hiddenCakeSizes=JSON.parse(localStorage.hiddenCakeSizes||'{}');
+function cakeKey(name){return cleanProductName(name).toLowerCase()}
+function cakeWeights(name){return [250,500,1000,2000].filter(grams=>!hiddenCakeSizes[cakeKey(name)]?.includes(grams))}
+function listedCakeWeight(name){const match=String(name).match(/(\d+(?:\.\d+)?)\s*(g|kg)\b/i);return match?Number(match[1])*(match[2].toLowerCase()==='kg'?1000:1):500}
+function defaultCakePrice(name,grams){
+  const group=all().filter(product=>product.c==='Cakes'&&cakeKey(product.n)===cakeKey(name));
+  const exact=group.find(product=>listedCakeWeight(product.n)===grams);
+  if(exact)return Number(prices[exact.n]??exact.p??0);
+  const reference=group.find(product=>listedCakeWeight(product.n)===500)||group[0];
+  return reference?Number(prices[reference.n]??reference.p??0)*grams/listedCakeWeight(reference.n):0;
+}
+function cakePrice(name,grams){const saved=cakeSizePrices[cakeKey(name)]?.[grams];return saved===undefined?defaultCakePrice(name,grams):Number(saved)}
 function setCakeEditorPrice(name,grams,value){
-  const product=productData(name),match=String(product?.n||'').match(/(\d+(?:\.\d+)?)\s*(g|kg)\b/i);
-  const reference=match?Number(match[1])*(match[2].toLowerCase()==='kg'?1000:1):500;
-  setPrice(name,Number(value)*reference/grams);renderEditor();
+  const price=Math.max(0,Number(value)||0),key=cakeKey(name);
+  cakeSizePrices[key]??={};cakeSizePrices[key][grams]=price;
+  localStorage.cakeSizePrices=JSON.stringify(cakeSizePrices);
+  /* Keep the editor in place. Each selected weight is stored independently. */
+}
+function deleteCakeWeight(name,grams){
+  if(!confirm(`Remove the ${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`} option for ${cleanProductName(name)}?`))return;
+  const key=cakeKey(name),target=all().find(product=>product.c==='Cakes'&&cakeKey(product.n)===key&&listedCakeWeight(product.n)===grams);
+  if(target&&all().filter(product=>product.c==='Cakes'&&cakeKey(product.n)===key).length>1)return deleteMenuItem('Cakes',target.n);
+  hiddenCakeSizes[key]??=[];if(!hiddenCakeSizes[key].includes(grams))hiddenCakeSizes[key].push(grams);
+  localStorage.hiddenCakeSizes=JSON.stringify(hiddenCakeSizes);renderEditor();
 }
 function renderEditor(){
-  editor.innerHTML=all().map(product=>{
-    const safe=product.n.replace(/'/g,"\\'");
-    if(product.c!=='Cakes')return `<div class="edit-row"><span>${product.c} · ${cleanProductName(product.n)}</span><input aria-label="Price for ${product.n}" type="number" step=".01" value="${product.p}" onchange="setPrice('${safe}',this.value)"></div>`;
-    return `<div class="edit-row" style="display:block"><b>Cakes · ${cleanProductName(product.n)}</b><div style="display:grid;grid-template-columns:repeat(4,minmax(76px,1fr));gap:8px;margin-top:8px">${[250,500,1000,2000].map(grams=>`<label style="font-size:.82rem">${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<input aria-label="${grams}g price for ${product.n}" type="number" step=".01" value="${cakePrice(product.n,grams).toFixed(2)}" onchange="setCakeEditorPrice('${safe}',${grams},this.value)"></label>`).join('')}</div></div>`;
+  editor.innerHTML=catalog.map(([category,items])=>{
+    const renderedCakes=new Set();
+    const rows=items.filter(([name])=>{if(category!=='Cakes')return true;const key=cakeKey(name);if(renderedCakes.has(key))return false;renderedCakes.add(key);return true}).map(([name,base])=>{
+      const safe=name.replace(/'/g,"\\'"),price=Number(prices[name]??base);
+      if(category!=='Cakes')return `<div class="edit-row"><span>${cleanProductName(name)}</span><input aria-label="Price for ${name}" type="number" step=".01" value="${price}" onchange="setPrice('${safe}',this.value)"></div>`;
+      return `<div class="edit-row" style="display:block"><b>${cleanProductName(name)}</b><div style="display:grid;grid-template-columns:repeat(4,minmax(76px,1fr));gap:8px;margin-top:8px">${cakeWeights(name).map(grams=>`<label style="font-size:.82rem">${grams===1000?'1kg':grams===2000?'2kg':`${grams}g`}<input aria-label="${grams}g price for ${name}" type="number" step=".01" value="${cakePrice(name,grams).toFixed(2)}" onchange="setCakeEditorPrice('${safe}',${grams},this.value)"><button type="button" class="small-btn" style="margin-top:5px;width:100%;font-size:.72rem" onclick="deleteCakeWeight('${safe}',${grams})">Delete</button></label>`).join('')}</div></div>`;
+    }).join('');
+    return `<section style="margin:0 0 24px"><h3 style="margin:0;padding:10px 0;border-bottom:2px solid var(--brown)">${category} section</h3>${rows||'<p>No products yet.</p>'}</section>`;
   }).join('')||'<p>No products yet.</p>';
-  menuManager.innerHTML=`<form class="menu-form" onsubmit="createCategory(event)"><b>Add a category</b><input id="newCategory" placeholder="Category name" required><button class="cta">Add category</button></form><form class="menu-form" onsubmit="createMenuItem(event)"><b>Add a product</b><select name="category" required><option value="">Choose category</option>${catalog.map(([category])=>`<option>${category}</option>`).join('')}</select><input name="itemName" placeholder="Item name" required><input name="itemPrice" type="number" step=".01" min="0" placeholder="Price in rupees" required><input name="itemPhoto" type="file" accept="image/*"><button class="cta">Add product</button></form><div class="menu-list"><b>Existing menu</b>${catalog.map(([category,items])=>`<div class="menu-group"><div class="menu-item"><b>${category}</b><button class="danger" onclick="deleteCategory('${category.replace(/'/g,"\\'")}')">Delete category</button></div>${items.map(([name])=>`<div class="menu-item"><span>${cleanProductName(name)}</span><button class="small-btn" onclick="deleteMenuItem('${category.replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}')">Delete</button></div>`).join('')||'<small>No items yet</small>'}</div>`).join('')}</div>`;
+  menuManager.innerHTML=`<form class="menu-form" onsubmit="createCategory(event)"><b>Add a category</b><input id="newCategory" placeholder="Category name" required><button class="cta">Add category</button></form><form class="menu-form" onsubmit="createMenuItem(event)"><b>Add a product</b><select name="category" required><option value="">Choose category</option>${catalog.map(([category])=>`<option>${category}</option>`).join('')}</select><input name="itemName" placeholder="Item name" required><input name="itemPrice" type="number" step=".01" min="0" placeholder="Price in rupees" required><input name="itemPhoto" type="file" accept="image/*"><button class="cta">Add product</button></form><div class="menu-list"><b>Existing menu</b>${catalog.map(([category,items])=>{const shown=category==='Cakes'?[...new Map(items.map(([name])=>[cakeKey(name),name])).values()]:items.map(([name])=>name);return `<div class="menu-group"><div class="menu-item"><b>${category}</b><button class="danger" onclick="deleteCategory('${category.replace(/'/g,"\\'")}')">Delete category</button></div>${shown.map(name=>`<div class="menu-item"><span>${cleanProductName(name)}</span><button class="small-btn" onclick="deleteMenuItem('${category.replace(/'/g,"\\'")}','${name.replace(/'/g,"\\'")}')">Delete</button></div>`).join('')||'<small>No items yet</small>'}</div>`}).join('')}</div>`;
 }
 
 /* Final home layout and cart compatibility fixes. */
