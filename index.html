@@ -136,8 +136,8 @@ var homeGreeting=document.createElement('span');
 homeGreeting.id='homeCustomerGreeting';
 homeGreeting.style.cssText='display:none;align-self:center;font-weight:800;color:var(--brown);white-space:nowrap';
 landingActions.prepend(homeGreeting);
-const adminAccessButton=[...landingActions.querySelectorAll('button')].find(button=>button.textContent.trim()==='Admin');
-const shopLogoutButton=document.createElement('button');
+var adminAccessButton=[...landingActions.querySelectorAll('button')].find(button=>button.textContent.trim()==='Admin');
+var shopLogoutButton=document.createElement('button');
 shopLogoutButton.id='customerLogoutButton';
 shopLogoutButton.textContent='Logout';
 shopLogoutButton.style.display='none';
@@ -152,7 +152,7 @@ async function syncCustomerNavigation(){
   if(homeGreeting){homeGreeting.textContent=message;homeGreeting.style.display=fullName?'inline':'none'}
   customerAccountButton.style.display=fullName?'none':'';
   if(adminAccessButton)adminAccessButton.style.display=fullName?'none':'';
-  shopLogoutButton.style.display=fullName?'':'none';
+  if(shopLogoutButton)shopLogoutButton.style.display=fullName?'':'none';
   return Boolean(fullName);
 }
 function openShop(){
