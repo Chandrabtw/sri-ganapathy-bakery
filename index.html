@@ -267,7 +267,7 @@ async function submitCustomerAuth(e){
   const result=await supabaseClient.auth.signInWithPassword({email,password});
   if(result.error)return alert(`Login failed: ${result.error.message}`);
   const adminCheck=await supabaseClient.rpc('is_admin');
-  if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This is an Admin account. Please use the Admin login.')}
+if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This account is not registered as a customer. Please use the Admin login.')}
   await updateCustomerAccountButton();closeModal();alert('Customer login successful.');
 }
 
