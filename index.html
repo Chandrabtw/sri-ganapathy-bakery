@@ -347,4 +347,20 @@ renderShop=function(){
     products.innerHTML=fallback.map(([name,price])=>`<article class="card"><img src="${imageFor(name)}" alt="${cleanProductName(name)}"><div class="info"><h3>${cleanProductName(name)}</h3><span class="price">₹${price.toFixed(2)}</span><div class="quantity"><button class="qty-btn" onclick="remove('${name}')">−</button><span class="qty-number">0</span><button class="qty-btn" onclick="add('${name}')">+</button></div></div></article>`).join('');
   }
 }
+/* Stable Cake tab renderer: keep Cake cards available even if remote menu data is incomplete. */
+const standardShopRender=renderShop;
+renderShop=function(){
+  const selected=catalog[active];
+  if(selected?.[0]!=='Cakes')return standardShopRender();
+  tabs.innerHTML=catalog.map(([category],index)=>`<button class="${index===active?'active':''}" onclick="active=${index};renderShop()">${category}</button>`).join('');
+  const fallback=[['Chocolate Truffle Cake',910],['Black Forest Cake',443],['White Forest Cake 500 G',443],['Butterscotch Cake 500 G',443],['Pineapple Rich Cake 500 G',395],['Hazelnut Chocolate Cake',657],['Plum Cake Box 500 G',505]];
+  const source=selected[1]?.length?selected[1]:fallback;
+  const cakes=[...new Map(source.map(item=>[cleanProductName(item[0]),item])).values()];
+  products.innerHTML=cakes.map(([name,base])=>{
+    const safe=name.replace(/'/g,"\\'"),basePrice=Number(prices[name]??base),photo=imageFor(name)||photos.cake;
+    const sizeButton=(grams,label,amount)=>`<button class="small-btn" style="padding:7px 4px;font-size:.72rem" onclick="addExactProduct('${safe}',${grams})">${label}<br>₹${amount.toFixed(2)}</button>`;
+    return `<article class="card"><img src="${photo}" alt="${cleanProductName(name)}"><div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">${sizeButton(250,'250g',basePrice/2)}${sizeButton(500,'500g',basePrice)}${sizeButton(1000,'1kg',basePrice*2)}${sizeButton(2000,'2kg',basePrice*4)}</div></div></article>`;
+  }).join('');
+  cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
+}
 </script></body></html>
