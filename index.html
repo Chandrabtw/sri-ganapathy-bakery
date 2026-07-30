@@ -286,7 +286,7 @@ if(adminCheck.data){await supabaseClient.auth.signOut();return alert('This accou
 }
 
 /* Cake weights have independent prices. They must never be derived from another weight. */
-const cakeSizePrices=JSON.parse(localStorage.cakeSizePrices||'{}');
+var cakeSizePrices=JSON.parse(localStorage.cakeSizePrices||'{}');
 var hiddenCakeSizes=JSON.parse(localStorage.hiddenCakeSizes||'{}');
 function cakeKey(name){return cleanProductName(name).toLowerCase()}
 function cakeWeights(name){return [250,500,1000,2000].filter(grams=>!hiddenCakeSizes?.[cakeKey(name)]?.includes(grams))}
@@ -298,7 +298,7 @@ function defaultCakePrice(name,grams){
   const reference=group.find(product=>listedCakeWeight(product.n)===500)||group[0];
   return reference?Number(prices[reference.n]??reference.p??0)*grams/listedCakeWeight(reference.n):0;
 }
-function cakePrice(name,grams){const saved=cakeSizePrices[cakeKey(name)]?.[grams];return saved===undefined?defaultCakePrice(name,grams):Number(saved)}
+function cakePrice(name,grams){const saved=cakeSizePrices?.[cakeKey(name)]?.[grams];return saved===undefined?defaultCakePrice(name,grams):Number(saved)}
 function setCakeEditorPrice(name,grams,value){
   const price=Math.max(0,Number(value)||0),key=cakeKey(name);
   cakeSizePrices[key]??={};cakeSizePrices[key][grams]=price;
