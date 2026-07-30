@@ -347,6 +347,10 @@ renderShop=function(){
   }
 }
 /* Stable Cake tab renderer: keep Cake cards available even if remote menu data is incomplete. */
+window.cakeSelections=window.cakeSelections||{};
+function selectCakeTileWeight(name,grams){window.cakeSelections[name]=grams;renderShop()}
+function cakeTileQuantity(name,grams){return cart.find(item=>(item.source||item.n)===name&&Number(item.weight_grams)===grams)?.q||0}
+function changeCakeTile(name,grams,delta){const key=cartKey(name,grams),item=cart.find(entry=>entry.key===key);if(delta>0){if(item)item.q++;else cart.push({key,n:name,source:name,weight_grams:grams,unit_price:cakePrice(name,grams),q:1})}else if(item){item.q--;if(item.q<=0)cart=cart.filter(entry=>entry!==item)}localStorage.cart=JSON.stringify(cart);renderShop()}
 const standardShopRender=renderShop;
 renderShop=function(){
   const selected=catalog[active];
@@ -357,8 +361,9 @@ renderShop=function(){
   const cakes=[...new Map(source.map(item=>[cleanProductName(item[0]),item])).values()];
   products.innerHTML=cakes.map(([name,base])=>{
     const safe=name.replace(/'/g,"\\'"),basePrice=Number(prices[name]??base),photo=imageFor(name)||photos.cake;
-    const sizeButton=(grams,label,amount)=>`<button class="small-btn" style="padding:7px 4px;font-size:.72rem" onclick="addExactProduct('${safe}',${grams})">${label}<br>₹${amount.toFixed(2)}</button>`;
-    return `<article class="card"><img src="${photo}" alt="${cleanProductName(name)}"><div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">${sizeButton(250,'250g',basePrice/2)}${sizeButton(500,'500g',basePrice)}${sizeButton(1000,'1kg',basePrice*2)}${sizeButton(2000,'2kg',basePrice*4)}</div></div></article>`;
+    const selectedGrams=window.cakeSelections[name]||500,weightOption=(grams,label,amount)=>`<label style="display:flex;gap:4px;align-items:center;font-size:.68rem"><input type="radio" name="cake-size-${safe}" ${selectedGrams===grams?'checked':''} onclick="selectCakeTileWeight('${safe}',${grams})">${label}<b>₹${amount.toFixed(2)}</b></label>`;
+    const quantity=cakeTileQuantity(name,selectedGrams);
+    return `<article class="card"><img src="${photo}" alt="${cleanProductName(name)}"><div class="info"><h3>${cleanProductName(name)}</h3><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:5px">${weightOption(250,'250g',basePrice/2)}${weightOption(500,'500g',basePrice)}${weightOption(1000,'1kg',basePrice*2)}${weightOption(2000,'2kg',basePrice*4)}</div><div class="quantity" style="justify-content:center"><button class="qty-btn" onclick="changeCakeTile('${safe}',${selectedGrams},-1)">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" onclick="changeCakeTile('${safe}',${selectedGrams},1)">+</button></div></div></article>`;
   }).join('');
   cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
 }
