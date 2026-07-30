@@ -158,6 +158,7 @@ supabaseClient.auth.onAuthStateChange((event,session)=>setTimeout(async()=>{
 (async()=>{const isCustomer=await syncCustomerNavigation();if(location.search.includes('page=order')||isCustomer)openShop()})();
 
 /* Temporary cake-size pricing. The menu price is treated as the 500g price. */
+/* GitHub Pages deployment: cake size selector enabled. */
 function cleanProductName(name){return name.replace(/\s+(?:Box\s+)?(?:\d+\s*)?(?:G|Kg)\b/ig,'').replace(/\s+Box$/i,'').trim()}
 function productData(name){return all().find(product=>product.n===name)}
 function isCake(name){return productData(name)?.c==='Cakes'}
