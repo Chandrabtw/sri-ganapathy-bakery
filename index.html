@@ -157,6 +157,50 @@ supabaseClient.auth.onAuthStateChange((event,session)=>setTimeout(async()=>{
 },0));
 (async()=>{const isCustomer=await syncCustomerNavigation();if(location.search.includes('page=order')||isCustomer)openShop()})();
 
+/* Temporary cake-size pricing. The menu price is treated as the 500g price. */
+function cleanProductName(name){return name.replace(/\s+(?:Box\s+)?(?:\d+\s*)?(?:G|Kg)\b/ig,'').replace(/\s+Box$/i,'').trim()}
+function productData(name){return all().find(product=>product.n===name)}
+function isCake(name){return productData(name)?.c==='Cakes'}
+function cakePrice(name,grams){const base=Number(productData(name)?.p||0);return grams===250?base/2:grams===1000?base*2:base}
+function cakeDescription(name){return `Freshly prepared ${cleanProductName(name)}. Select the weight that is right for your celebration.`}
+function cartKey(source,grams){return `${source}__${grams||'standard'}`}
+function cartUnitPrice(item){return Number(item.unit_price ?? productData(item.source||item.n)?.p ?? 0)}
+function cartLabel(item){return item.weight_grams?`${cleanProductName(item.n)} · ${item.weight_grams}g`:cleanProductName(item.n)}
+function productQty(name){return cart.filter(item=>(item.source||item.n)===name).reduce((sum,item)=>sum+item.q,0)}
+function showCakeSizePicker(name){
+  const image=imageFor(name),sizes=[250,500,1000];
+  modalContent.innerHTML=`<button class="close" onclick="closeModal()">×</button><div style="display:grid;grid-template-columns:minmax(170px,.8fr) 1.2fr;gap:20px;align-items:start"><img src="${image}" alt="${cleanProductName(name)}" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:15px"><div><h2 style="margin-bottom:8px">${cleanProductName(name)}</h2><p style="color:#765f50;line-height:1.5">${cakeDescription(name)}</p><label style="display:block;font-weight:700;margin:16px 0 8px">Choose cake weight</label><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${sizes.map((grams,index)=>`<button id="cakeSize${grams}" class="small-btn" style="padding:12px 6px;border:2px solid ${index===1?'var(--brown)':'var(--line)'}" onclick="selectCakeWeight('${name.replace(/'/g,"\\'")}',${grams})">${grams===1000?'1 kg':`${grams}g`}<br><b>₹${cakePrice(name,grams).toFixed(2)}</b></button>`).join('')}</div><p id="selectedCakePrice" class="total" style="margin:16px 0">Selected: 500g · ₹${cakePrice(name,500).toFixed(2)}</p><button class="cta" style="width:100%" onclick="addCakeToCart('${name.replace(/'/g,"\\'")}')">Add to cart</button></div></div>`;
+  window.selectedCake={name,grams:500};modal.style.display='block';
+}
+function selectCakeWeight(name,grams){
+  window.selectedCake={name,grams};
+  [250,500,1000].forEach(size=>{const button=document.getElementById(`cakeSize${size}`);if(button)button.style.borderColor=size===grams?'var(--brown)':'var(--line)'});
+  document.getElementById('selectedCakePrice').textContent=`Selected: ${grams===1000?'1 kg':`${grams}g`} · ₹${cakePrice(name,grams).toFixed(2)}`;
+}
+function addCakeToCart(name){const grams=window.selectedCake?.name===name?window.selectedCake.grams:500;addExactProduct(name,grams);closeModal()}
+function addExactProduct(name,grams){
+  const key=cartKey(name,grams),unitPrice=grams?cakePrice(name,grams):Number(productData(name)?.p||0);
+  let item=cart.find(product=>product.key===key);
+  if(item)item.q++;else cart.push({key,n:name,source:name,weight_grams:grams||null,unit_price:unitPrice,q:1});
+  localStorage.cart=JSON.stringify(cart);renderShop();
+}
+function add(name){if(isCake(name))return showCakeSizePicker(name);addExactProduct(name,null)}
+function remove(name){const item=cart.filter(product=>(product.source||product.n)===name).sort((a,b)=>(b.weight_grams||0)-(a.weight_grams||0))[0];if(!item)return;item.q--;if(item.q<=0)cart=cart.filter(product=>product!==item);localStorage.cart=JSON.stringify(cart);renderShop()}
+function changeCart(key,delta){const item=cart.find(product=>product.key===key);if(!item)return;if(delta>0)item.q++;else {item.q--;if(item.q<=0)cart=cart.filter(product=>product!==item)}localStorage.cart=JSON.stringify(cart);renderShop();showCart()}
+function renderShop(){
+  tabs.innerHTML=catalog.map(([category],index)=>`<button class="${index===active?'active':''}" onclick="active=${index};renderShop()">${category}</button>`).join('');
+  const [category,items]=catalog[active]||['',[]],displayItems=category==='Cakes'?[...new Map(items.map(item=>[cleanProductName(item[0]),item])).values()]:items;
+  products.innerHTML=displayItems.map(([name,base])=>{const price=Number(prices[name]??base),quantity=productQty(name),safe=name.replace(/'/g,"\\'"),source=imageFor(name),photo=source?`<img alt="${cleanProductName(name)}" src="${source}">`:'<div class="empty-photo"></div>';return `<article class="card">${photo}<div class="info"><h3>${cleanProductName(name)}</h3><span class="price">${category==='Cakes'?`From ₹${(price/2).toFixed(2)}`:`₹${price.toFixed(2)}`}</span><div class="quantity"><button class="qty-btn" aria-label="Remove one ${cleanProductName(name)}" onclick="remove('${safe}')">−</button><span class="qty-number">${quantity}</span><button class="qty-btn" aria-label="Add one ${cleanProductName(name)}" onclick="add('${safe}')">+</button></div></div></article>`}).join('');
+  cartCount.textContent=cart.reduce((sum,item)=>sum+item.q,0);
+}
+function showCart(){
+  const lines=cart.map(item=>{const safe=item.key.replace(/'/g,"\\'"),source=imageFor(item.source||item.n),photo=source?`<img src="${source}" alt="${cartLabel(item)}" style="width:64px;height:64px;object-fit:cover;border-radius:12px">`:'<div style="width:64px;height:64px;border-radius:12px;background:#f2d5b7"></div>';return `<div class="line"><div style="display:flex;gap:12px;align-items:center">${photo}<div><b>${cartLabel(item)}</b><div class="quantity"><button class="qty-btn" onclick="changeCart('${safe}',-1)">−</button><span class="qty-number">${item.q}</span><button class="qty-btn" onclick="changeCart('${safe}',1)">+</button></div></div></div><b>₹${(cartUnitPrice(item)*item.q).toFixed(2)}</b></div>`}).join('')||'<p>Your cart is empty.</p>';
+  const total=cart.reduce((sum,item)=>sum+cartUnitPrice(item)*item.q,0);
+  modalContent.innerHTML=`<h2>Your cart</h2>${lines}${cart.length?`<div class="checkout-wrap"><button class="cta" onclick="checkout()">Checkout</button><span class="total cart-total">Total: ₹${total.toFixed(2)}</span></div>`:''}`;modal.style.display='block';
+}
+function checkout(){const total=cart.reduce((sum,item)=>sum+cartUnitPrice(item)*item.q,0);modalContent.innerHTML=`<h2>Pay at the bakery</h2><p class="notice">Scan the QR and place your pickup order.</p><img class="qr" alt="Dummy payment QR" src="https://api.qrserver.com/v1/create-qr-code/?size=210x210&data=UPI-DEMO-SRI-GANAPATHY-BAKERY"><form onsubmit="placeOrder(event)" style="display:grid;gap:10px"><input name="customerName" placeholder="Your name" required style="padding:10px;border:1px solid var(--line);border-radius:8px"><input name="customerPhone" placeholder="Mobile number" required style="padding:10px;border:1px solid var(--line);border-radius:8px"><button class="cta">Place order · ₹${total.toFixed(2)}</button></form>`}
+async function placeOrder(e){e.preventDefault();if(!cart.length)return;const form=e.currentTarget,items=cart.map(item=>({product_id:window.liveProductIds?.[item.source||item.n],quantity:item.q,weight_grams:item.weight_grams||500}));if(items.some(item=>!item.product_id))return alert('Menu is still syncing. Please refresh and try again.');const result=await supabaseClient.rpc('place_customer_order',{p_customer_name:form.customerName.value.trim(),p_customer_phone:form.customerPhone.value.trim(),p_items:items});if(result.error)return alert(result.error.message);cart=[];localStorage.cart='[]';closeModal();renderShop();alert('Order placed successfully. Please show the payment screen at pickup.')}
+
 /* Weight selection for products that have real size variants in the menu. */
 function weightVariantsFor(name){
   if(!/^Plum Cake Box\s+(250 G|500 G|1 Kg)$/i.test(name))return [];
